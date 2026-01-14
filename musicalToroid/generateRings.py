@@ -68,19 +68,73 @@ def generateRing(numSegments, numPeaks, ringRad):
 
 	return np.concatenate([xVert, yVert, zVert], axis=1), np.array(faces)
 
-#fig = plt.figure()
-#ax = fig.add_subplot(projection="3d")
-#ax.scatter(xVert, yVert, zVert)
-#ax.set_aspect('equal')
-#plt.show()
 
-vertices, faces = generateRing(100, 50, 1)
+def genVertices(x, y, xRange, rotation, ringRad):
+	phi = normalizePoints(x, xRange, [-np.pi / 2.0, np.pi / 2.0])  # Convert x coordinate to be within range -pi/2 to pi/2
+	x, zCord = pol2cart(y, phi)  # make a semi-circle, peaks being the magnitude, phi being the rotation step
+	x = np.add(x, ringRad)  # Add the ring radius
+	xCord, yCord = pol2cart(x, rotation)  # Calculate x and y coordinates of 3d scatter
 
-# Create the mesh
-ring = mesh.Mesh(np.zeros(faces.shape[0], dtype=mesh.Mesh.dtype))
-for i, f in enumerate(faces):
-    for j in range(3):
-        ring.vectors[i][j] = vertices[f[j],:]
+	xCord = np.reshape(xCord, (-1, 1))
+	yCord = np.reshape(yCord, (-1, 1))
+	zCord = np.reshape(zCord, (-1, 1))
 
-# Write the mesh to file "ring.stl"
-ring.save('ring.stl')
+	return np.concatenate([xCord, yCord, zCord], axis=1)
+
+
+def genFaces(idx, numSegments, numPeaks):
+
+	faces = []
+
+	if idx + 1 < numSegments:
+		nextIdx = idx + 1
+	else:
+		nextIdx = 0
+
+	colA = np.arange(idx * numPeaks, idx * numPeaks + numPeaks - 1)
+	colB = np.add(colA, 1)
+	colC = np.arange(nextIdx * numPeaks, nextIdx * numPeaks + numPeaks - 1)
+	colD = np.add(colC, 1)
+	vertical = [np.array([colA[0], colB[-1], colC[0]]), np.array([colB[-1], colC[0], colD[-1]])]
+
+	colA = np.reshape(colA, (-1, 1))
+	colB = np.reshape(colB, (-1, 1))
+	colC = np.reshape(colC, (-1, 1))
+	colD = np.reshape(colD, (-1, 1))
+
+	faces.extend(np.concatenate([colA, colB, colC], axis=1))
+	faces.extend(np.concatenate([colC, colD, colB], axis=1))
+	faces.extend(vertical)
+
+	return faces
+
+
+def genSTL(vertices, faces, fileName):
+	# Create the mesh
+	ring = mesh.Mesh(np.zeros(faces.shape[0], dtype=mesh.Mesh.dtype))
+	for i, f in enumerate(faces):
+		for j in range(3):
+			ring.vectors[i][j] = vertices[f[j], :]
+
+	# Write the mesh to file "ring.stl"
+	ring.save('%s.stl' % fileName)
+
+"""
+print("gen ring 1")
+vertOne, facOne = generateRing(3, 6, 1)
+genSTL(vertOne, facOne, "ring1")
+
+
+print("gen ring 2")
+numPeaks = 6
+numSegments = 3
+vertTwo = []
+facTwo = []
+x, y = genXYCords(numPeaks, 1)  # Get peaks and x coordinates
+for idx in range(numSegments):
+	rotation = [2.0 * np.pi * (idx / numSegments)]  # calculate the rotation radian about z-axis
+	vertTwo.extend(genVertices(x, y, [0, numPeaks - 1], rotation, ringRad=1))
+	facTwo.extend(genFaces(idx, numSegments, numPeaks))
+
+genSTL(np.array(vertTwo), np.array(facTwo), "ring2")
+"""
